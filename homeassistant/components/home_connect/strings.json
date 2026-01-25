@@ -790,6 +790,9 @@
       }
     },
     "sensor": {
+      "active_program_display": {
+        "name": "Active program display"
+      },
       "alarm_clock_elapsed": {
         "name": "Alarm clock elapsed",
         "state": {

@@ -69,6 +69,12 @@ BSH_PROGRAM_SENSORS = (
         translation_key="program_progress",
         appliance_types=APPLIANCES_WITH_PROGRAMS,
     ),
+    HomeConnectSensorEntityDescription(
+        key=f"{EventKey.BSH_COMMON_ROOT_ACTIVE_PROGRAM}_display",
+        translation_key="active_program_display",
+        appliance_types=APPLIANCES_WITH_PROGRAMS,
+        entity_registry_enabled_default=False,
+    ),
 )
 
 SENSORS = (
@@ -530,6 +536,13 @@ def _get_entities_for_appliance(
             for description in SENSORS
             if description.key in appliance.status
         ],
+        *[
+            HomeConnectActiveProgramDisplaySensor(entry.runtime_data, appliance, desc)
+            for desc in BSH_PROGRAM_SENSORS
+            if desc.translation_key == "active_program_display"
+            and desc.appliance_types
+            and appliance.info.type in desc.appliance_types
+        ],
     ]
 
 
@@ -659,3 +672,37 @@ class HomeConnectEventSensor(HomeConnectSensor):
             self._update_native_value(event.value)
         elif self._attr_native_value is None:
             self._attr_native_value = self.entity_description.default_value
+
+
+class HomeConnectActiveProgramDisplaySensor(HomeConnectSensor):
+    """Sensor class for Home Connect active program."""
+
+    _attr_entity_registry_enabled_default = False
+
+    def update_native_value(self) -> None:
+        """Set the value of the sensor."""
+        event = self.appliance.events.get(cast(EventKey, self.bsh_key))
+
+        if not event:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {}
+            return
+
+        raw_value = cast(str, event)
+
+        # format the program name to look like a regular program name
+        program_name = raw_value.split(".")[-1]
+        formatted_value = self.split_camel_case(program_name)
+
+        self._attr_native_value = formatted_value  # formatted_value
+        self._attr_extra_state_attributes = {"raw_value": raw_value}
+
+    @staticmethod
+    def split_camel_case(name: str) -> str:
+        """Split a camel case string into separate words."""
+        result = []
+        for i, c in enumerate(name):
+            if i > 0 and c.isupper() and name[i - 1].islower():
+                result.append(" ")
+            result.append(c)
+        return "".join(result)
